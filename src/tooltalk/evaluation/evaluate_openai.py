@@ -58,13 +58,6 @@ class OpenAIPredictor(BaseAPIPredictor):
                 })
             elif turn["role"] == "api":
 
-                # # Quick workaround
-                # if openai_history[-1]["role"] == "assistant":
-                #     openai_history.append({
-                #     "role": "user",
-                #     "content": "Okay."
-                #     })
-
                 # Tool call
                 openai_history.append({
                     "role": "assistant",
@@ -82,19 +75,15 @@ class OpenAIPredictor(BaseAPIPredictor):
                 })
 
         prompt = self.tokenizer.apply_chat_template(openai_history, tokenize=False, add_generation_prompt=True)
-        print(prompt)
         openai_response = self.client.completions.create(
             model=self.model,
             prompt=prompt,
             extra_body={'use_raw_prompt': True},
             )
-        # openai_response = self.client.chat.completions.create(
-        #     model=self.model,
-        #     messages=openai_history,
-        # )
         # logger.debug(f"OpenAI full response: {openai_response}")
         logger.info(f"OpenAI full response: {openai_response}")
         openai_message = openai_response.choices[0].text
+        print(openai_message)
 
         metadata = {
             "openai_request": {
