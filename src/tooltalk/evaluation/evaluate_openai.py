@@ -12,7 +12,7 @@ from collections import Counter
 from enum import Enum
 from typing import List
 
-import openai
+# import jsonpickle
 from openai import OpenAI
 from tooltalk.apis import ALL_APIS, APIS_BY_NAME
 from tooltalk.evaluation.tool_executor import BaseAPIPredictor, ToolExecutor
@@ -80,8 +80,7 @@ class OpenAIPredictor(BaseAPIPredictor):
             prompt=prompt,
             extra_body={'use_raw_prompt': True},
             )
-        # logger.debug(f"OpenAI full response: {openai_response}")
-        logger.info(f"OpenAI full response: {openai_response}")
+        logger.debug(f"OpenAI full response: {openai_response}")
         openai_message = openai_response.choices[0].text
         print(openai_message)
 
@@ -91,7 +90,7 @@ class OpenAIPredictor(BaseAPIPredictor):
                 "messages": openai_history,
                 "functions": self.api_docs,
             },
-            "openai_response": openai_response
+            "openai_response": "" #openai_response
         }
         if "function_call" in openai_message:
             function_call = openai_message["function_call"]
