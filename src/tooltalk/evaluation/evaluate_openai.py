@@ -18,6 +18,7 @@ from tooltalk.apis import ALL_APIS, APIS_BY_NAME
 from tooltalk.evaluation.tool_executor import BaseAPIPredictor, ToolExecutor
 from tooltalk.utils.file_utils import get_names_and_paths
 from tqdm import tqdm
+from transformers import AutoTokenizer
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,6 +33,11 @@ class OpenAIPredictor(BaseAPIPredictor):
         self.client=client
         self.model = model
         self.api_docs = [api.to_openai_doc(disable_docs) for api in apis_used]
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "databricks/dbrx-instruct",
+            trust_remote_code=True,
+            token="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",
+            )
 
     def predict(self, metadata: dict, conversation_history: dict) -> dict:
         system_prompt = self.system_prompt.format(
@@ -52,6 +58,13 @@ class OpenAIPredictor(BaseAPIPredictor):
                 })
             elif turn["role"] == "api":
 
+                # # Quick workaround
+                # if openai_history[-1]["role"] == "assistant":
+                #     openai_history.append({
+                #     "role": "user",
+                #     "content": "Okay."
+                #     })
+
                 # Tool call
                 openai_history.append({
                     "role": "assistant",
@@ -68,15 +81,20 @@ class OpenAIPredictor(BaseAPIPredictor):
                     "content": json.dumps(response_content)
                 })
 
-        print(openai_history)
-        openai_response = self.client.chat.completions.create(
+        prompt = self.tokenizer.apply_chat_template(openai_history, tokenize=False, add_generation_prompt=True)
+        print(prompt)
+        openai_response = self.client.completions.create(
             model=self.model,
-            messages=openai_history,
-            # extra_body={'use_raw_prompt': True},
-            # functions=self.api_docs,
-        )
-        logger.debug(f"OpenAI full response: {openai_response}")
-        openai_message = openai_response.choices[0].message
+            prompt=prompt,
+            extra_body={'use_raw_prompt': True},
+            )
+        # openai_response = self.client.chat.completions.create(
+        #     model=self.model,
+        #     messages=openai_history,
+        # )
+        # logger.debug(f"OpenAI full response: {openai_response}")
+        logger.info(f"OpenAI full response: {openai_response}")
+        openai_message = openai_response.choices[0].text
 
         metadata = {
             "openai_request": {
@@ -107,7 +125,7 @@ class OpenAIPredictor(BaseAPIPredictor):
         else:
             return {
                 "role": "assistant",
-                "text": openai_message.content,
+                "text": openai_message,
                 # store metadata about call
                 "metadata": metadata,
             }
@@ -278,6 +296,7 @@ def main(flags: List[str] = None):
         if EvalModes.EVALUATE in args.modes:
             logger.info("Running evaluation...")
             conversation = tool_executor.evaluate_predictions(conversation)
+            print(conversation)
             logger.info(f"Conversation {file_name} pass: {conversation['metrics']['success']}")
             total_metrics += conversation["metrics"]
             total_metrics["num_conversations"] += 1
