@@ -13,10 +13,10 @@ from enum import Enum
 from typing import List
 
 import openai
+from openai import OpenAI
 from tooltalk.apis import ALL_APIS, APIS_BY_NAME
 from tooltalk.evaluation.tool_executor import BaseAPIPredictor, ToolExecutor
 from tooltalk.utils.file_utils import get_names_and_paths
-from tooltalk.utils.openai_utils import openai_chat_completion
 from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +28,8 @@ class OpenAIPredictor(BaseAPIPredictor):
                     "\ntimestamp: {timestamp}" \
                     "\nusername (if logged in): {username}"
 
-    def __init__(self, model, apis_used, disable_docs=False):
+    def __init__(self, client, model, apis_used, disable_docs=False):
+        self.client=client
         self.model = model
         self.api_docs = [api.to_openai_doc(disable_docs) for api in apis_used]
 
@@ -67,13 +68,16 @@ class OpenAIPredictor(BaseAPIPredictor):
                     "content": json.dumps(response_content)
                 })
 
-        openai_response = openai_chat_completion(
+        print(openai_history)
+        openai_response = self.client.chat.completions.create(
             model=self.model,
             messages=openai_history,
+            # extra_body={'use_raw_prompt': True},
             # functions=self.api_docs,
         )
         logger.debug(f"OpenAI full response: {openai_response}")
-        openai_message = openai_response["choices"][0]["message"]
+        openai_message = openai_response.choices[0].message
+
         metadata = {
             "openai_request": {
                 "model": self.model,
@@ -103,7 +107,7 @@ class OpenAIPredictor(BaseAPIPredictor):
         else:
             return {
                 "role": "assistant",
-                "text": openai_message["content"],
+                "text": openai_message.content,
                 # store metadata about call
                 "metadata": metadata,
             }
@@ -208,7 +212,7 @@ def get_arg_parser():
     parser.add_argument("--dataset", type=str, help="Path to dataset for models to evaluate")
     parser.add_argument("--database", type=str, help="Path to database used in evaluation")
     parser.add_argument("--api_key", type=str, default="openai.key", help="Path to OpenAI API key")
-    parser.add_argument("--api_base", type=str, help="The base url for the API.")
+    parser.add_argument("--base_url", type=str, help="The base url for the API.")
     parser.add_argument("--api_mode", type=str, choices=["exact", "suite", "all"], default="all",
                         help="API mode to use for evaluation, determines which api docs to include")
     parser.add_argument("--model", type=str, default="gpt-4", help="Model to use for generation")
@@ -226,12 +230,14 @@ def main(flags: List[str] = None):
     parser = get_arg_parser()
     args = parser.parse_args(flags)
 
-    # get api key, api base
+    # Initialize OpenAI client
     openai_key = os.environ.get("OPENAI_KEY", None)
     if openai_key is None:
         openai_key = args.api_key
-    openai.api_key = openai_key
-    openai.api_base = args.api_base
+    client = OpenAI(
+        api_key=openai_key,
+        base_url=args.base_url,
+    )
 
     total_metrics = Counter()
     os.makedirs(args.output_dir, exist_ok=True)
@@ -262,6 +268,7 @@ def main(flags: List[str] = None):
                 raise ValueError(f"Invalid api mode: {args.api_mode}")
 
             predictor_func = OpenAIPredictor(
+                client=client,
                 model=args.model,
                 apis_used=apis_used,
                 disable_docs=args.disable_documentation
