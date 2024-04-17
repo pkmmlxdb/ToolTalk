@@ -23,6 +23,7 @@ def retry_on_limit(func, retries=5, wait=60):
         raise openai.error.RateLimitError
     return wrapper
 
-
-openai_chat_completion = retry_on_limit(openai.ChatCompletion.create)
-openai_completion = retry_on_limit(openai.Completion.create)
+openai_chat_completion = openai.ChatCompletion.create
+openai_completion = openai.Completion.create
+# openai_chat_completion = retry_on_limit(openai.ChatCompletion.create)
+# openai_completion = retry_on_limit(openai.Completion.create)
