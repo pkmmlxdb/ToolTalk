@@ -91,16 +91,17 @@ class OpenAIPredictor(BaseAPIPredictor):
             )
         logger.debug(f"OpenAI full response: {openai_response}")
         openai_message = openai_response.choices[0].text
-        print(openai_message)
 
-        metadata = {
-            "openai_request": {
-                "model": self.model,
-                "messages": openai_history,
-                "functions": self.api_docs,
-            },
-            "openai_response": "" #openai_response
-        }
+        # metadata = {
+        #     "openai_request": {
+        #         "model": self.model,
+        #         "messages": openai_history,
+        #         "functions": self.api_docs,
+        #     },
+        #     "openai_response": "" #openai_response
+        # }
+        # metadata = {
+        metadata = {}
         if "function_call" in openai_message:
             function_call = openai_message["function_call"]
             api_name = function_call["name"]
