@@ -65,14 +65,14 @@ class OpenAIPredictor(BaseAPIPredictor):
                 }
                 openai_history.append({
                     "role": "function",
-                    "name": turn["request"]["api_name"],
+                    # "name": turn["request"]["api_name"],
                     "content": json.dumps(response_content)
                 })
 
         openai_response = openai_chat_completion(
             model=self.model,
             messages=openai_history,
-            functions=self.api_docs,
+            # functions=self.api_docs,
         )
         logger.debug(f"OpenAI full response: {openai_response}")
         openai_message = openai_response["choices"][0]["message"]
