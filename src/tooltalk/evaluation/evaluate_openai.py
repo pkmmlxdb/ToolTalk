@@ -4,21 +4,20 @@ Licensed under the MIT license.
 
 Evaluate Tool LLM on API-Talk dataset.
 """
-import os
+import argparse
 import json
 import logging
-import argparse
+import os
+from collections import Counter
 from enum import Enum
 from typing import List
-from collections import Counter
 
 import openai
-from tqdm import tqdm
-
-from tooltalk.apis import APIS_BY_NAME, ALL_APIS
-from tooltalk.evaluation.tool_executor import ToolExecutor, BaseAPIPredictor
+from tooltalk.apis import ALL_APIS, APIS_BY_NAME
+from tooltalk.evaluation.tool_executor import BaseAPIPredictor, ToolExecutor
 from tooltalk.utils.file_utils import get_names_and_paths
 from tooltalk.utils.openai_utils import openai_chat_completion
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -123,6 +122,7 @@ def get_arg_parser():
     parser.add_argument("--dataset", type=str, help="Path to dataset for models to evaluate")
     parser.add_argument("--database", type=str, help="Path to database used in evaluation")
     parser.add_argument("--api_key", type=str, default="openai.key", help="Path to OpenAI API key")
+    parser.add_argument("--api_base", type=str, help="The base url for the API.")
     parser.add_argument("--api_mode", type=str, choices=["exact", "suite", "all"], default="all",
                         help="API mode to use for evaluation, determines which api docs to include")
     parser.add_argument("--model", type=str, default="gpt-4", help="Model to use for generation")
@@ -140,12 +140,12 @@ def main(flags: List[str] = None):
     parser = get_arg_parser()
     args = parser.parse_args(flags)
 
-    # get api key
+    # get api key, api base
     openai_key = os.environ.get("OPENAI_KEY", None)
     if openai_key is None:
-        with open(args.api_key, "r") as f:
-            openai_key = f.read().strip()
+        openai_key = args.api_key
     openai.api_key = openai_key
+    openai.api_base = args.api_base
 
     total_metrics = Counter()
     os.makedirs(args.output_dir, exist_ok=True)
