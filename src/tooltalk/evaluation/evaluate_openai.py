@@ -20,6 +20,9 @@ from tooltalk.utils.file_utils import get_names_and_paths
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
+from .predictors.dbrx_predictor import DBRXPredictor
+from .predictors.openai_predictor import OpenAIPredictor
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -34,99 +37,6 @@ timestamp: {timestamp}
 username (if logged in): {username}
 """
 
-class OpenAIPredictor(BaseAPIPredictor):
-
-    def __init__(self, client, model, apis_used, disable_docs=False):
-        self.client=client
-        self.model = model
-        self.api_docs = [api.to_openai_doc(disable_docs) for api in apis_used]
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "databricks/dbrx-instruct",
-            trust_remote_code=True,
-            token="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",
-            )
-
-    def predict(self, metadata: dict, conversation_history: dict) -> dict:
-        api_docs_str = '\n'.join([json.dumps(api_doc) for api_doc in self.api_docs])
-        system_prompt = SYSTEM_PROMPT.format(
-            functions=api_docs_str,
-            location=metadata["location"],
-            timestamp=metadata["timestamp"],
-            username=metadata.get("username")
-        )
-
-        openai_history = [{
-            "role": "system",
-            "content": system_prompt
-        }]
-        for turn in conversation_history:
-            if turn["role"] == "user" or turn["role"] == "assistant":
-                openai_history.append({
-                    "role": turn["role"],
-                    "content": turn["text"]
-                })
-            elif turn["role"] == "api":
-
-                # Tool call
-                openai_history.append({
-                    "role": "assistant",
-                    "content": turn["request"]["api_name"] + json.dumps(turn["request"]["parameters"])
-                    })
-
-                # Tool response
-                response_content = {
-                    "response": turn["response"],
-                    "exception": turn["exception"]
-                }
-                openai_history.append({
-                    "role": "user",
-                    "content": json.dumps(response_content)
-                })
-
-        prompt = self.tokenizer.apply_chat_template(openai_history, tokenize=False, add_generation_prompt=True)
-        openai_response = self.client.completions.create(
-            model=self.model,
-            prompt=prompt,
-            extra_body={'use_raw_prompt': True},
-            )
-        logger.debug(f"OpenAI full response: {openai_response}")
-        openai_message = openai_response.choices[0].text
-
-        # metadata = {
-        #     "openai_request": {
-        #         "model": self.model,
-        #         "messages": openai_history,
-        #         "functions": self.api_docs,
-        #     },
-        #     "openai_response": "" #openai_response
-        # }
-        # metadata = {
-        metadata = {}
-        if "function_call" in openai_message:
-            function_call = openai_message["function_call"]
-            api_name = function_call["name"]
-            try:
-                parameters = json.loads(function_call["arguments"])
-            except json.decoder.JSONDecodeError:
-                # check termination reason
-                logger.info(f"Failed to decode arguments for {api_name}: {function_call['arguments']}")
-                parameters = None
-            return {
-                "role": "api",
-                "request": {
-                    "api_name": api_name,
-                    "parameters": parameters
-                },
-                # store metadata about call
-                "metadata": metadata,
-            }
-        else:
-            return {
-                "role": "assistant",
-                "text": openai_message,
-                # store metadata about call
-                "metadata": metadata,
-            }
 
 
 # class OpenAIPredictor(BaseAPIPredictor):
@@ -238,6 +148,7 @@ def get_arg_parser():
                         help="disabled documentation sent to GPT-4 replacing with empty strings")
     parser.add_argument("--modes", choices=list(EvalModes), type=str, nargs='+', default=list(EvalModes),
                         help="Evaluation modes")
+    parser.add_argument("--predictor", type=str, help="The model predictor")
 
     return parser
 
@@ -283,12 +194,22 @@ def main(flags: List[str] = None):
             else:
                 raise ValueError(f"Invalid api mode: {args.api_mode}")
 
-            predictor_func = OpenAIPredictor(
-                client=client,
-                model=args.model,
-                apis_used=apis_used,
-                disable_docs=args.disable_documentation
-            )
+
+            if args.predictor == "dbrx":
+                predictor_func = DBRXPredictor(
+                    client=client,
+                    model=args.model,
+                    apis_used=apis_used,
+                    disable_docs=args.disable_documentation
+                )
+            elif args.predictor == "openai":
+                predictor_func = OpenAIPredictor(
+                    client=client,
+                    model=args.model,
+                    apis_used=apis_used,
+                    disable_docs=args.disable_documentation
+                )
+
             conversation = tool_executor.run_conversation(conversation, predictor_func)
 
         if EvalModes.EVALUATE in args.modes:
