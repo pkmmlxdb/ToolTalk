@@ -69,7 +69,7 @@ class OpenAIPredictor(BaseAPIPredictor):
             model=self.model,
             messages=openai_history,
             tools=self.api_docs,
-            tool_choice="auto"
+            tool_choice="auto",
             )
 
         logger.debug(f"OpenAI full response: {openai_response}")
@@ -83,8 +83,8 @@ class OpenAIPredictor(BaseAPIPredictor):
         #     "openai_response": openai_response
         # }
         metadata = {}
-        if "function_call" in openai_message:
-            function_call = openai_message.function_call
+        if openai_message.tool_calls:
+            function_call = openai_message.tool_calls[0].function
             api_name = function_call.name
             try:
                 parameters = json.loads(function_call.arguments)
