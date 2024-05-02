@@ -12,10 +12,9 @@ from collections import Counter
 from enum import Enum
 from typing import List
 
-# import jsonpickle
 from openai import OpenAI
 from tooltalk.apis import ALL_APIS, APIS_BY_NAME
-from tooltalk.evaluation.tool_executor import BaseAPIPredictor, ToolExecutor
+from tooltalk.evaluation.tool_executor import ToolExecutor
 from tooltalk.utils.file_utils import get_names_and_paths
 from tqdm import tqdm
 from transformers import AutoTokenizer

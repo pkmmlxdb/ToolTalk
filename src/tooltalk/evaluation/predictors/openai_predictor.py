@@ -2,7 +2,6 @@ import json
 import logging
 
 from tooltalk.evaluation.tool_executor import BaseAPIPredictor
-from tooltalk.utils.openai_utils import openai_chat_completion
 
 SYSTEM_PROMPT = """"You are an expert in composing functions. You are given a question and a set of possible functions. Based on the question, you will need to make one or more function/tool calls to achieve the purpose. If none of the function can be used, point it out. If the given question lacks the parameters required by the function, also point it out.
 Here is a list of functions in JSON format that you can invoke:\n{functions}.
