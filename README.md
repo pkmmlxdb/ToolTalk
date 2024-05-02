@@ -47,8 +47,8 @@ pytest tests
 
 ## Reproducing the results
 
-The results on GPT-3.5-turbo and GPT-4 can be reproduced using the following commands. This requires having access to 
-OpenAI's API. The results will be saved in the `results` folder. The script caches intermediary results, so it can be 
+The results on GPT-3.5-turbo and GPT-4 can be reproduced using the following commands. This requires having access to
+OpenAI's API. The results will be saved in the `results` folder. The script caches intermediary results, so it can be
 re-run if it is interrupted for any reason.
 
 ```bash
@@ -70,7 +70,7 @@ python -m tooltalk.generation.scenario_generator --prompt src/prompts/scenario_t
 ## Evaluating on new models
 
 The easiest way to evaluate on new models would be to create a new `Predictor` class that inherits from `tooltalk.evaluation.tool_executor.BaseAPIPredictor`.
-For an example of how to do this, see `tooltalk.evaluation.tool_executor.GPT3Predictor` and `tooltalk.evaluation.evaluate_openai.OpenAIPredictor`.
+For an example of how to do this, see `tooltalk.evaluation.tool_executor.GPT3Predictor` and `tooltalk.evaluation.evaluate.OpenAIPredictor`.
 
 ## Citing
 
@@ -99,8 +99,8 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ## Trademarks
 
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft 
-trademarks or logos is subject to and must follow 
+This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
+trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.
