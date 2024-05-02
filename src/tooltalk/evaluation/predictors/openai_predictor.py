@@ -36,11 +36,15 @@ class OpenAIPredictor(BaseAPIPredictor):
                     "role": turn["role"],
                     "content": turn["text"]
                 })
+
+
+            # we currently use a function_call keyword, but this should probably be tool_call which has the following format
+            # ChatCompletion(id='chatcmpl-9KXAPvtDiRwbHyFppflrv1suCkp7J', choices=[Choice(finish_reason='tool_calls', index=0, logprobs=None, message=ChatCompletionMessage(content=None, role='assistant', function_call=None, tool_calls=[ChatCompletionMessageToolCall(id='call_9JoDdZB4T8WomLfpC5dHdEJ8', function=Function(arguments='{"receiver":"ickyvicky","message":"Check out this video: utube.com/slkd"}', name='SendMessage'), type='function')]))], created=1714681081, model='gpt-3.5-turbo-0125', object='chat.completion', system_fingerprint='fp_3b956da36b', usage=CompletionUsage(completion_tokens=28, prompt_tokens=2194, total_tokens=2222))
             elif turn["role"] == "api":
                 openai_history.append({
                     "role": "assistant",
                     "content": None,
-                    "function_call": {
+                    "function_call": { # should this be `tool_calls`? this will have a diff format
                         "name": turn["request"]["api_name"],
                         "arguments": json.dumps(turn["request"]["parameters"])
                     }
