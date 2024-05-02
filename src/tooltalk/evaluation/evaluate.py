@@ -57,7 +57,7 @@ def main(flags: List[str] = None):
     args = parser.parse_args(flags)
 
     # Initialize OpenAI client
-    openai_key = os.environ.get("OPENAI_KEY", None)
+    openai_key = os.environ.get("OPENAI_API_KEY", None)
     if openai_key is None:
         openai_key = args.api_key
     client = OpenAI(
