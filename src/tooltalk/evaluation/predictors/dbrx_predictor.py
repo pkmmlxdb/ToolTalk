@@ -36,14 +36,8 @@ class DBRXPredictor(BaseAPIPredictor):
             if end_index == -1:
                 return None
 
-        function_call = message[start_index + len(start_tag):end_index].strip()
+        function_call = message[start_index + len(start_tag):end_index].strip(" \n")
         return function_call
-
-
-    def parse_function_call(self, function_call):
-        name = function_call.split("(")[0][1:]
-        args = function_call.split("(")[1][:-2]
-        return name, args
 
     def is_tool_used(self, message):
         return "<tool_call>" in message or "</tool_call>" in message
