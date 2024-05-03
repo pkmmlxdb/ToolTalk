@@ -91,7 +91,6 @@ class DBRXPredictor(BaseAPIPredictor):
         openai_message = openai_response.choices[0].text
 
         # Get metadata
-        logger.info("This prompt is {n_tokens} long.")
         # metadata = {x
         #     "openai_request": {
         #         "model": self.model,
