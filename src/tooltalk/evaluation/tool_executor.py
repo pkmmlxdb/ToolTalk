@@ -5,13 +5,13 @@ Licensed under the MIT license.
 import json
 import logging
 import os
-from typing import List
-from datetime import datetime
-from collections import deque
 from abc import ABC, abstractmethod
+from collections import deque
+from datetime import datetime
+from typing import List
 
 from tooltalk.apis import ALL_APIS
-from tooltalk.apis.account import ACCOUNT_DB_NAME, UserLogin, LogoutUser, RegisterUser
+from tooltalk.apis.account import ACCOUNT_DB_NAME, LogoutUser, RegisterUser, UserLogin
 from tooltalk.utils.file_utils import get_names_and_paths
 
 logger = logging.getLogger(__name__)
@@ -277,13 +277,15 @@ class ToolExecutor:
                     break
                 elif prediction["role"] == "api":
                     # execute api call
-                    if prediction["request"]["parameters"] is None:
+                    request = prediction["request"]
+                    # if request["parameters"] is None # for openai
+                    if request["api_name"] is None: # for dbrx; can this also work for openai?
                         response = {
                             "response": None,
                             "exception": "Failed to parse API call"
                         }
                     else:
-                        request, response = self.execute_tool(**prediction["request"])
+                        request, response = self.execute_tool(**request)
                     prediction_and_response = {
                         "request": request,
                         "response": response["response"],
