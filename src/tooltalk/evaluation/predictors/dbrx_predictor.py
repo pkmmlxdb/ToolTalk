@@ -23,18 +23,19 @@ class DBRXPredictor(BaseAPIPredictor):
             token="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",
             )
 
-    def get_function_call(self, message):
-        func = message.split("FUNCTION_CALL")[-1]
-        func = func.strip(" \n")
-        if not func.startswith("["):
-            func = "[" + func
-        if not func.endswith("]"):
-            func = func + "]"
-        if func.startswith("['"):
-            func = func.replace("['", "[")
-        if func.endswith("]'"):
-            func = func.replace("]'", "]")
-        return func
+    def get_function_call(self, message, start_tag = "<tool_call>", end_tag = "</tool_call>"):
+
+        start_index = message.find(start_tag)
+        if start_index == -1:
+            return None
+
+        end_index = message.find(end_tag, start_index + len(start_tag))
+        if end_index == -1:
+            return None
+
+        function_call = message[start_index + len(start_tag):end_index].strip()
+        return function_call
+
 
     def parse_function_call(self, function_call):
         name = function_call.split("(")[0][1:]
@@ -76,7 +77,7 @@ class DBRXPredictor(BaseAPIPredictor):
                 }
                 openai_history.append({
                     "role": "user",
-                    "content": json.dumps(response_content)
+                    "content": f"<tool_response>\n{json.dumps(response_content)}\n</tool_response>"
                 })
 
         prompt = self.tokenizer.apply_chat_template(openai_history, tokenize=False, add_generation_prompt=True)
@@ -97,15 +98,18 @@ class DBRXPredictor(BaseAPIPredictor):
         # }
         metadata = {}
 
-        if "FUNCTION_CALL" in openai_message:
-            function_call = self.get_function_call(openai_message)
-            api_name, parameters_str = self.parse_function_call(function_call)
+        if "<tool_call>" in openai_message and "</tool_call>" in openai_message:
+            function_call_str = self.get_function_call(openai_message)
+
             try:
-                parameters = json.loads(parameters_str)
+                function_call_json = json.loads(function_call_str)
+                api_name, parameters = function_call_json["name"], function_call_json["arguments"]
             except json.decoder.JSONDecodeError:
                 # check termination reason
-                logger.info(f"Failed to decode arguments for {api_name}: {parameters_str}")
+                logger.info(f"Failed to decode this function call:\n{function_call_str}")
                 parameters = None
+                api_name = None
+
             return {
                 "role": "api",
                 "request": {
