@@ -20,6 +20,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 
 from .predictors.dbrx_predictor import DBRXPredictor
+from .predictors.mistral_predictor import MistralPredictor
 from .predictors.openai_predictor import OpenAIPredictor
 
 logging.basicConfig(level=logging.INFO)
@@ -103,6 +104,13 @@ def main(flags: List[str] = None):
                 )
             elif args.predictor == "openai":
                 predictor_func = OpenAIPredictor(
+                    client=client,
+                    model=args.model,
+                    apis_used=apis_used,
+                    disable_docs=args.disable_documentation
+                )
+            elif args.predictor == "mistral":
+                predictor_func = MistralPredictor(
                     client=client,
                     model=args.model,
                     apis_used=apis_used,
