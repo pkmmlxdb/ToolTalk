@@ -42,4 +42,7 @@ Here is some user data:
 location: {location}
 timestamp: {timestamp}
 username (if logged in): {username}
+
+Remember, don't make assumptions about what values to plug into functions. If you are missing the parameters to make a function call, please ask the user for the parameters. Do not be afraid to ask.
+
 """
