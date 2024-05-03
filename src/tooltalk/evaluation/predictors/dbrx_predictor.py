@@ -40,7 +40,7 @@ class DBRXPredictor(BaseAPIPredictor):
         return function_call
 
     def is_tool_used(self, message):
-        return "<tool_call>" in message or "</tool_call>" in message
+        return "<tool_call>" in message and "</tool_call>" in message
 
     def predict(self, metadata: dict, conversation_history: dict) -> dict:
         api_docs_str = '\n'.join([json.dumps(api_doc) for api_doc in self.api_docs])
@@ -80,14 +80,19 @@ class DBRXPredictor(BaseAPIPredictor):
                 })
 
         prompt = self.tokenizer.apply_chat_template(openai_history, tokenize=False, add_generation_prompt=True)
+
         openai_response = self.client.completions.create(
             model=self.model,
             prompt=prompt,
             extra_body={'use_raw_prompt': True},
+            max_tokens=4096,
             )
         logger.debug(f"OpenAI full response: {openai_response}")
         openai_message = openai_response.choices[0].text
-        # metadata = {
+
+        # Get metadata
+        logger.info("This prompt is {n_tokens} long.")
+        # metadata = {x
         #     "openai_request": {
         #         "model": self.model,
         #         "messages": openai_history,
@@ -95,7 +100,13 @@ class DBRXPredictor(BaseAPIPredictor):
         #     },
         #     "openai_response": "" #openai_response
         # }
-        metadata = {}
+        metadata = {
+            "tokens": {
+                "completion_tokens": openai_response.usage.completion_tokens,
+                "prompt_tokens": openai_response.usage.prompt_tokens,
+                "total_tokens": openai_response.usage.total_tokens,
+                }
+            }
 
         if not self.is_tool_used(openai_message):
             return {
@@ -103,17 +114,14 @@ class DBRXPredictor(BaseAPIPredictor):
                 "text": openai_message,
                 "metadata": metadata,
             }
-        else:
-            try:
-                function_call_str = self.get_function_call(openai_message)
-                function_call_json = json.loads(function_call_str)
-                api_name, parameters = function_call_json["name"], function_call_json["arguments"]
-            except json.decoder.JSONDecodeError:
-                # check termination reason
-                logger.info(f"Failed to decode this function call:\n{function_call_str}")
-                parameters = None
-                api_name = None
 
+
+        try:
+            function_call_str = self.get_function_call(openai_message)
+        except TypeError:
+            logger.info(f"Failed to decode the tags of this function call:\n{function_call_str}")
+            parameters = None
+            api_name = None
             return {
                 "role": "api",
                 "request": {
@@ -122,3 +130,22 @@ class DBRXPredictor(BaseAPIPredictor):
                 },
                 "metadata": metadata,
             }
+
+        try:
+            function_call_str = self.get_function_call(openai_message)
+            function_call_json = json.loads(function_call_str)
+            api_name, parameters = function_call_json["name"], function_call_json["arguments"]
+        except json.decoder.JSONDecodeError:
+            # check termination reason
+            logger.info(f"Failed to decode this function call into json:\n{function_call_str}")
+            parameters = None
+            api_name = None
+
+        return {
+            "role": "api",
+            "request": {
+                "api_name": api_name,
+                "parameters": parameters
+            },
+            "metadata": metadata,
+        }
