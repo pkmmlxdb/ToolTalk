@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class DBRXPredictor(BaseAPIPredictor):
 
     def __init__(self, client, model, apis_used, disable_docs=False):
-        self.client=client
+        self.client = client
         self.model = model
         self.api_docs = [api.to_openai_doc(disable_docs) for api in apis_used]
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -91,7 +91,7 @@ class DBRXPredictor(BaseAPIPredictor):
         openai_message = openai_response.choices[0].text
 
         # Get metadata
-        # metadata = {x
+        # metadata = {
         #     "openai_request": {
         #         "model": self.model,
         #         "messages": openai_history,
@@ -135,7 +135,6 @@ class DBRXPredictor(BaseAPIPredictor):
             function_call_json = json.loads(function_call_str)
             api_name, parameters = function_call_json["name"], function_call_json["arguments"]
         except json.decoder.JSONDecodeError:
-            # check termination reason
             logger.info(f"Failed to decode this function call into json:\n{function_call_str}")
             parameters = None
             api_name = None
