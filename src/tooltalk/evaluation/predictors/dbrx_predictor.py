@@ -31,7 +31,10 @@ class DBRXPredictor(BaseAPIPredictor):
 
         end_index = message.find(end_tag, start_index + len(start_tag))
         if end_index == -1:
-            return None
+            # if end_tag not present, check for last occurrence of start_tag and use this as the end_index
+            end_index = message.rfind(start_tag, start_index + len(start_tag))
+            if end_index == -1:
+                return None
 
         function_call = message[start_index + len(start_tag):end_index].strip()
         return function_call
@@ -42,6 +45,8 @@ class DBRXPredictor(BaseAPIPredictor):
         args = function_call.split("(")[1][:-2]
         return name, args
 
+    def is_tool_used(self, message):
+        return "<tool_call>" in message or "</tool_call>" in message
 
     def predict(self, metadata: dict, conversation_history: dict) -> dict:
         api_docs_str = '\n'.join([json.dumps(api_doc) for api_doc in self.api_docs])
@@ -67,7 +72,7 @@ class DBRXPredictor(BaseAPIPredictor):
                 # Tool call
                 openai_history.append({
                     "role": "assistant",
-                    "content": turn["request"]["api_name"] + json.dumps(turn["request"]["parameters"])
+                    "content": json.dumps(turn["request"]["api_name"]) + json.dumps(turn["request"]["parameters"])
                     })
 
                 # Tool response
@@ -98,10 +103,15 @@ class DBRXPredictor(BaseAPIPredictor):
         # }
         metadata = {}
 
-        if "<tool_call>" in openai_message and "</tool_call>" in openai_message:
-            function_call_str = self.get_function_call(openai_message)
-
+        if not self.is_tool_used(openai_message):
+            return {
+                "role": "assistant",
+                "text": openai_message,
+                "metadata": metadata,
+            }
+        else:
             try:
+                function_call_str = self.get_function_call(openai_message)
                 function_call_json = json.loads(function_call_str)
                 api_name, parameters = function_call_json["name"], function_call_json["arguments"]
             except json.decoder.JSONDecodeError:
@@ -116,11 +126,5 @@ class DBRXPredictor(BaseAPIPredictor):
                     "api_name": api_name,
                     "parameters": parameters
                 },
-                "metadata": metadata,
-            }
-        else:
-            return {
-                "role": "assistant",
-                "text": openai_message,
                 "metadata": metadata,
             }
