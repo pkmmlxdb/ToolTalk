@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 
-class DBRXPredictor(BaseAPIPredictor):
+class UnguidedPredictor(BaseAPIPredictor):
 
     def __init__(self, client, model, apis_used, disable_docs=False):
         self.client = client
@@ -84,7 +84,7 @@ class DBRXPredictor(BaseAPIPredictor):
         openai_response = self.client.completions.create(
             model=self.model,
             prompt=prompt,
-            extra_body={'use_raw_prompt': True},
+            # extra_body={'use_raw_prompt': True},
             max_tokens=4096,
             )
         logger.debug(f"OpenAI full response: {openai_response}")

@@ -8,7 +8,7 @@ from .constants import SYSTEM_PROMPT
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class OpenAIPredictor(BaseAPIPredictor):
+class GuidedPredictor(BaseAPIPredictor):
     system_prompt = "You are a helpful assistant. Here is some user data:" \
                     "\nlocation: {location}" \
                     "\ntimestamp: {timestamp}" \

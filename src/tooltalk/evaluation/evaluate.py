@@ -19,9 +19,9 @@ from tooltalk.utils.file_utils import get_names_and_paths
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
-from .predictors.dbrx_predictor import DBRXPredictor
+from .predictors.guided_predictor import GuidedPredictor
 from .predictors.mistral_predictor import MistralPredictor
-from .predictors.openai_predictor import OpenAIPredictor
+from .predictors.unguided_predictor import UnguidedPredictor
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -49,6 +49,7 @@ def get_arg_parser():
     parser.add_argument("--modes", choices=list(EvalModes), type=str, nargs='+', default=list(EvalModes),
                         help="Evaluation modes")
     parser.add_argument("--predictor", type=str, help="The model predictor")
+    parser.add_argument("--guided", action="store_true", default=False, help="Use guided generation.")
 
     return parser
 
@@ -95,27 +96,42 @@ def main(flags: List[str] = None):
                 raise ValueError(f"Invalid api mode: {args.api_mode}")
 
 
-            if args.predictor == "dbrx":
-                predictor_func = DBRXPredictor(
+            if args.guided:
+                 predictor_func = GuidedPredictor(
                     client=client,
                     model=args.model,
                     apis_used=apis_used,
                     disable_docs=args.disable_documentation
                 )
-            elif args.predictor == "openai":
-                predictor_func = OpenAIPredictor(
+            else:
+                predictor_func = UnguidedPredictor(
                     client=client,
                     model=args.model,
                     apis_used=apis_used,
                     disable_docs=args.disable_documentation
                 )
-            elif args.predictor == "mistral":
-                predictor_func = MistralPredictor(
-                    client=client,
-                    model=args.model,
-                    apis_used=apis_used,
-                    disable_docs=args.disable_documentation
-                )
+
+            # if args.predictor == "dbrx":
+                # predictor_func = DBRXPredictor(
+                #     client=client,
+                #     model=args.model,
+                #     apis_used=apis_used,
+                #     disable_docs=args.disable_documentation
+                # )
+            # elif args.predictor == "openai":
+            #     predictor_func = OpenAIPredictor(
+            #         client=client,
+            #         model=args.model,
+            #         apis_used=apis_used,
+            #         disable_docs=args.disable_documentation
+            #     )
+            # elif args.predictor == "mistral":
+            #     predictor_func = MistralPredictor(
+            #         client=client,
+            #         model=args.model,
+            #         apis_used=apis_used,
+            #         disable_docs=args.disable_documentation
+            #     )
 
             conversation = tool_executor.run_conversation(conversation, predictor_func)
 
