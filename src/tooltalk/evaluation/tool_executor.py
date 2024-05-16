@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import List
 
 from tooltalk.apis import ALL_APIS
-from tooltalk.apis.account import ACCOUNT_DB_NAME, LogoutUser, RegisterUser, UserLogin
+from tooltalk.apis.account import ACCOUNT_DB_NAME, DeleteAccount, UserLogin, LogoutUser, RegisterUser
 from tooltalk.utils.file_utils import get_names_and_paths
 
 logger = logging.getLogger(__name__)
@@ -99,13 +99,14 @@ class ToolExecutor:
                     "exception": "User is not logged in"
                 }
                 return request, response
-            elif api_name in [UserLogin.__name__, RegisterUser.__name__]:
-                response = {
-                    "response": None,
-                    "exception": "Only one user can be logged in at a time"
-                }
-                return request, response
             parameters["session_token"] = self.session_token
+        if api_name in [UserLogin.__name__, RegisterUser.__name__] and self.session_token is not None:
+            username = tool.check_session_token(self.session_token)["username"]
+            response = {
+                "response": None,
+                "exception": f"Only one user can be logged in at a time. Current user is {username}.",
+            }
+            return request, response
 
         # execute tool
         response = tool(**parameters)
@@ -113,7 +114,7 @@ class ToolExecutor:
         # capture session_token and simulate login and logout
         if api_name in [UserLogin.__name__, RegisterUser.__name__] and response["exception"] is None:
             self.session_token = response["response"]["session_token"]
-        elif api_name == LogoutUser.__name__ and response["exception"] is None:
+        elif api_name in [LogoutUser.__name__, DeleteAccount.__name__] and response["exception"] is None:
             self.session_token = None
         return request, response
 
@@ -130,7 +131,7 @@ class ToolExecutor:
             return False
         return self.apis[api_name].is_action
 
-    def evaluate_predictions(self, conversation_with_predictions: dict) -> List[bool]:
+    def evaluate_predictions(self, conversation_with_predictions: dict) -> dict:
         """
         Compare predictions in a conversation with complete ground truth in conversation returning metrics.
         Calculates recall over ground truth, where predictions can only match to function in ground truth once.
@@ -210,6 +211,7 @@ class ToolExecutor:
         action_precision = valid_action_count / action_count if action_count > 0 else 1
         bad_action_rate = bad_action_count / action_count if action_count > 0 else 0
         success = recall == 1.0 and bad_action_rate == 0.0
+        soft_success = recall * (1.0 - bad_action_rate)
         metrics = {
             "predictions": len(predictions),
             "ground_truths": len(ground_truths),
@@ -223,7 +225,8 @@ class ToolExecutor:
             # number of actions matching ground truth
             "bad_action_rate": bad_action_rate,
             # how often an action is bad aka successful but not matching ground truth
-            "success": success
+            "success": success,
+            "soft_success": soft_success,
         }
         conversation_with_predictions["metrics"] = metrics
         return conversation_with_predictions
@@ -277,9 +280,14 @@ class ToolExecutor:
                     break
                 elif prediction["role"] == "api":
                     # execute api call
+<<<<<<< HEAD
                     request = prediction["request"]
                     # if request["parameters"] is None # for openai
                     if request["api_name"] is None: # for dbrx; can this also work for openai?
+=======
+                    if prediction["request"]["parameters"] is None:
+                        request = prediction["request"]
+>>>>>>> fa49ae1e2eabbcd20d689f29687471eb2f691dc2
                         response = {
                             "response": None,
                             "exception": "Failed to parse API call"
@@ -300,10 +308,6 @@ class ToolExecutor:
 
             # add predictions to original conversation object
             turn["predictions"] = predictions
-            ground_truth_history.append({
-                "role": "assistant",
-                "text": turn["text"]
-            })
             if "apis" in turn:
                 for api in turn["apis"]:
                     api_history.append(api)
@@ -313,6 +317,10 @@ class ToolExecutor:
                         "response": api["response"],
                         "exception": api["exception"]
                     })
+            ground_truth_history.append({
+                "role": "assistant",
+                "text": turn["text"]
+            })
 
         return conversation
 
