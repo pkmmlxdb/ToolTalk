@@ -12,9 +12,9 @@ from collections import Counter
 from enum import Enum
 from typing import List
 
-from openai import OpenAI
-from tooltalk.apis import ALL_APIS, APIS_BY_NAME
-from tooltalk.evaluation.tool_executor import ToolExecutor
+import openai
+from tooltalk.apis import ALL_APIS, APIS_BY_NAME, SUITES_BY_NAME
+from tooltalk.evaluation.tool_executor import BaseAPIPredictor, ToolExecutor
 from tooltalk.utils.file_utils import get_names_and_paths
 from tqdm import tqdm
 from transformers import AutoTokenizer
@@ -89,7 +89,9 @@ def main(flags: List[str] = None):
             if args.api_mode == "exact":
                 apis_used = [APIS_BY_NAME[api_name] for api_name in conversation["apis_used"]]
             elif args.api_mode == "suite":
-                apis_used = [api for suite in conversation["suites_used"] for api in suite.apis]
+                apis_used = [
+                    api for suite_name in conversation["suites_used"] for api in SUITES_BY_NAME[suite_name].apis
+                ]
             elif args.api_mode == "all":
                 apis_used = ALL_APIS
             else:
