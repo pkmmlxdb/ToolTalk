@@ -5,20 +5,19 @@ Licensed under the MIT license.
 This script randomly samples API suites from API Bank and prompts GPT4 to generate queries that make use of at least
 one API from each sampled suite.
 """
-import os
-import re
+import argparse
 import json
 import logging
-import argparse
+import os
+import re
 from itertools import combinations
-from typing import Optional, List
+from typing import List, Optional
 
 import openai
-from tqdm import tqdm
-
 from tooltalk.apis import ALL_SUITES
 from tooltalk.utils.file_utils import chunkify
 from tooltalk.utils.openai_utils import openai_completion
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
