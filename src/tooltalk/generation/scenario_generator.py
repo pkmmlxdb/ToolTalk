@@ -14,7 +14,6 @@ from itertools import combinations
 from typing import List, Optional
 
 from openai import OpenAI
-from openai.types import CompletionChoice
 from tooltalk.apis import ALL_SUITES
 from tooltalk.utils.file_utils import chunkify
 from tooltalk.utils.openai_utils import openai_completion
@@ -125,8 +124,8 @@ def main(flags: Optional[List[str]] = None) -> None:
                     scenarios = extract_scenarios(responses)
                     logger.info(f"Number of scenarios generated {list(map(len, scenarios))}")
                     for output_dict, response, scenario in zip(batch, responses, scenarios):
-                        response: CompletionChoice = response
-                        output_dict["response"] = response.model_dump_json()
+                        response = response
+                        output_dict["response"] = response.text
                         output_dict["scenarios"] = scenario
                     break
             else:
