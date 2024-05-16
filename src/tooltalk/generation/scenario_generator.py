@@ -13,7 +13,8 @@ import re
 from itertools import combinations
 from typing import List, Optional
 
-import openai
+from openai import OpenAI
+from openai.types import CompletionChoice
 from tooltalk.apis import ALL_SUITES
 from tooltalk.utils.file_utils import chunkify
 from tooltalk.utils.openai_utils import openai_completion
@@ -30,8 +31,8 @@ def extract_scenarios(responses):
     extracted_scenarios = list()
     scenario_regex = re.compile(r"\s*- Scenario \d: (?P<scenario>.*)\s*")
     for response in responses:
-        full_response = response
-        raw_scenarios = scenario_regex.split(full_response)
+        response_text = response.text
+        raw_scenarios = scenario_regex.split(response_text)
         # TODO extract APIs used and scenarios from format
         scenarios = list()
         for scenario in raw_scenarios:
@@ -49,6 +50,7 @@ def get_arg_parser():
     parser.add_argument("--model", type=str, default="gpt-4", help="OpenAI model to use")
     parser.add_argument("--api_counts", type=int, nargs="+", default=[3], help="Number of suites to use")
     parser.add_argument("--api_key", type=str, help="Optional API key for endpoint")
+    parser.add_argument("--base_url", type=str, help="The base url of the API.")
     parser.add_argument("--max_tokens", type=int, nargs="+", default=[25000], help="Maximum number of tokens to generate")
     parser.add_argument("--temperature", type=float, default=0, help="Temperature for sampling")
     parser.add_argument("--beams", type=int, default=1, help="Number of beams to use for generation")
@@ -71,6 +73,12 @@ def main(flags: Optional[List[str]] = None) -> None:
 
     if API_DOC_KEY not in prompt_template:
         raise ValueError(f"Prompt template must contain key {API_DOC_KEY}")
+
+    api_key = args.api_key
+    if api_key is None:
+        api_key = os.environ.get("OPENAI_API_KEY")
+
+    client = OpenAI(api_key=api_key, base_url=args.base_url)
 
     os.makedirs(args.output_dir, exist_ok=True)
     # TODO make async
@@ -101,7 +109,7 @@ def main(flags: Optional[List[str]] = None) -> None:
             prompts = [output_dict["prompt"] for output_dict in batch]
             for max_tokens in args.max_tokens:
                 try:
-                    response_texts = openai_completion(
+                    completion = client.completions.create(
                         model=args.model,
                         prompt=prompts,
                         max_tokens=max_tokens,
@@ -110,13 +118,15 @@ def main(flags: Optional[List[str]] = None) -> None:
                     )
                 except ValueError as error:
                     logger.error(f"Failed output using {max_tokens}: {error}")
-                    logger.info(response_texts)
+                    logger.info(completion)
                     continue
                 else:
-                    scenarios = extract_scenarios(response_texts)
+                    responses = completion.choices
+                    scenarios = extract_scenarios(responses)
                     logger.info(f"Number of scenarios generated {list(map(len, scenarios))}")
-                    for output_dict, response, scenario in zip(batch, response_texts, scenarios):
-                        output_dict["response"] = response
+                    for output_dict, response, scenario in zip(batch, responses, scenarios):
+                        response: CompletionChoice = response
+                        output_dict["response"] = response.model_dump_json()
                         output_dict["scenarios"] = scenario
                     break
             else:
