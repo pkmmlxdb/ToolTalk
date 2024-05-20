@@ -1,27 +1,55 @@
 import json
 import logging
+import os
+from openai import OpenAI
 
-from tooltalk.evaluation.tool_executor import BaseAPIPredictor
+from eval_generations.benchmarks.ToolTalk.src.tooltalk.evaluation.tool_executor import BaseAPIPredictor
 from transformers import AutoTokenizer
 
-from .constants import DBRX_SYSTEM_PROMPT
+from .constants import SYSTEM_PROMPT, DBRX_SYSTEM_PROMPT
+
+from eval_generations.utils.vllm import VLLM_Generator
+from eval_generations.utils.generator import call_generate, Generator, Prompt
+from eval_generations.defaults import PROJECT_PATH
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-
 class UnguidedPredictor(BaseAPIPredictor):
 
-    def __init__(self, client, model, apis_used, disable_docs=False):
-        self.client = client
-        self.model = model
-        self.api_docs = [api.to_openai_doc(disable_docs) for api in apis_used]
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "databricks/dbrx-instruct",
-            trust_remote_code=True,
-            token="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",
+    def __init__(self, model, apis_used, argslist):
+        if argslist.is_openai:
+            # Initialize OpenAI client
+            openai_key = os.environ.get("OPENAI_API_KEY", None)
+            if openai_key is None:
+                openai_key = argslist.api_key
+            self.client = OpenAI(
+                api_key=openai_key,
+                base_url=argslist.base_url,
             )
+        else: 
+            run_name = model.split('/')[1].lower() + '-' + argslist.dataset.split('/')[-1].lower()
+
+            # We will use a vLLM wrapper 
+            self.model = VLLM_Generator(
+                model_path_or_name=model,
+                max_minutes_to_wait_for_vllm=120,
+                deployment_id=run_name,
+                go_to_11=True,
+                remote=True,
+                stop_deployment=False,
+                clusters_not_in=['r14z4']
+            ).__enter__()
+#            self.model.__enter__()
+        
+        self.temperature = 0 
+        self.top_p = 1
+        self.max_tokens = 4096
+
+        self.is_openai = argslist.is_openai
+        self.api_docs = [api.to_openai_doc(argslist.disable_documentation) for api in apis_used]
 
     def get_function_call(self, message, start_tag = "<tool_call>", end_tag = "</tool_call>"):
 
@@ -44,27 +72,26 @@ class UnguidedPredictor(BaseAPIPredictor):
 
     def predict(self, metadata: dict, conversation_history: dict) -> dict:
         api_docs_str = '\n'.join([json.dumps(api_doc) for api_doc in self.api_docs])
-        system_prompt = DBRX_SYSTEM_PROMPT.format(
+        system_prompt = SYSTEM_PROMPT.format(
             functions=api_docs_str,
             location=metadata["location"],
             timestamp=metadata["timestamp"],
             username=metadata.get("username")
         )
 
-        openai_history = [{
+        conv_history = [{
             "role": "system",
             "content": system_prompt
         }]
         for turn in conversation_history:
             if turn["role"] == "user" or turn["role"] == "assistant":
-                openai_history.append({
+                conv_history.append({
                     "role": turn["role"],
                     "content": turn["text"]
                 })
             elif turn["role"] == "api":
-
                 # Tool call
-                openai_history.append({
+                conv_history.append({
                     "role": "assistant",
                     "content": json.dumps(turn["request"]["api_name"]) + json.dumps(turn["request"]["parameters"])
                     })
@@ -74,49 +101,66 @@ class UnguidedPredictor(BaseAPIPredictor):
                     "response": turn["response"],
                     "exception": turn["exception"]
                 }
-                openai_history.append({
+                conv_history.append({
                     "role": "user",
                     "content": f"<tool_response>\n{json.dumps(response_content)}\n</tool_response>"
                 })
+        
+        if self.is_openai: 
+            model_response = self.client.chat.completions.create(
+                model=self.argslist.model,
+                prompt=conv_history,
+                temperature=self.temperature,
+                top_p = self.top_p,
+                max_tokens=self.max_tokens,
+                )
+        else: 
+            try:
+                model_response = call_generate(self.model.generate,
+                            Prompt(
+                                id = None,
+                                prompt=conv_history
+                            ),
+                            use_completion_endpoint=False,
+                            with_retry=True,
+                            temperature=self.temperature,
+                            top_p=self.top_p,
+                            max_tokens=self.max_tokens,
+                        )
+            except Exception as e:
+                print(e)
+                import time; time.sleep(10); pass
 
-        prompt = self.tokenizer.apply_chat_template(openai_history, tokenize=False, add_generation_prompt=True)
-
-        openai_response = self.client.completions.create(
-            model=self.model,
-            prompt=prompt,
-            # extra_body={'use_raw_prompt': True},
-            max_tokens=4096,
-            )
-        logger.debug(f"OpenAI full response: {openai_response}")
-        openai_message = openai_response.choices[0].text
+        
+        logger.debug(f"Model full response: {model_response}")
+        model_message = model_response
 
         # Get metadata
         # metadata = {
         #     "openai_request": {
         #         "model": self.model,
-        #         "messages": openai_history,
+        #         "messages": conv_history,
         #         "functions": self.api_docs,
         #     },
-        #     "openai_response": "" #openai_response
+        #     "model_response": "" #model_response
         # }
         metadata = {
             "tokens": {
-                "completion_tokens": openai_response.usage.completion_tokens,
-                "prompt_tokens": openai_response.usage.prompt_tokens,
-                "total_tokens": openai_response.usage.total_tokens,
+                # "completion_tokens": model_response.usage.completion_tokens,
+                # "prompt_tokens": model_response.usage.prompt_tokens,
+                # "total_tokens": model_response.usage.total_tokens,
                 }
             }
 
-        if not self.is_tool_used(openai_message):
+        if not self.is_tool_used(model_message):
             return {
                 "role": "assistant",
-                "text": openai_message,
+                "text": model_message,
                 "metadata": metadata,
             }
 
-
         try:
-            function_call_str = self.get_function_call(openai_message)
+            function_call_str = self.get_function_call(model_message)
         except TypeError:
             logger.info(f"Failed to decode the tags of this function call:\n{function_call_str}")
             parameters = None
@@ -131,7 +175,7 @@ class UnguidedPredictor(BaseAPIPredictor):
             }
 
         try:
-            function_call_str = self.get_function_call(openai_message)
+            function_call_str = self.get_function_call(model_message)
             function_call_json = json.loads(function_call_str)
             api_name, parameters = function_call_json["name"], function_call_json["arguments"]
         except json.decoder.JSONDecodeError:

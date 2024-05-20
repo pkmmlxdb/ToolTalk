@@ -10,9 +10,9 @@ from collections import deque
 from datetime import datetime
 from typing import List
 
-from tooltalk.apis import ALL_APIS
-from tooltalk.apis.account import ACCOUNT_DB_NAME, DeleteAccount, UserLogin, LogoutUser, RegisterUser
-from tooltalk.utils.file_utils import get_names_and_paths
+from eval_generations.benchmarks.ToolTalk.src.tooltalk.apis import ALL_APIS
+from eval_generations.benchmarks.ToolTalk.src.tooltalk.apis.account import ACCOUNT_DB_NAME, DeleteAccount, UserLogin, LogoutUser, RegisterUser
+from eval_generations.benchmarks.ToolTalk.src.tooltalk.utils.file_utils import get_names_and_paths
 
 logger = logging.getLogger(__name__)
 
@@ -280,14 +280,11 @@ class ToolExecutor:
                     break
                 elif prediction["role"] == "api":
                     # execute api call
-<<<<<<< HEAD
-                    request = prediction["request"]
+                    # request = prediction["request"]
                     # if request["parameters"] is None # for openai
-                    if request["api_name"] is None: # for dbrx; can this also work for openai?
-=======
+                    # if request["api_name"] is None: # for dbrx; can this also work for openai?
                     if prediction["request"]["parameters"] is None:
                         request = prediction["request"]
->>>>>>> fa49ae1e2eabbcd20d689f29687471eb2f691dc2
                         response = {
                             "response": None,
                             "exception": "Failed to parse API call"

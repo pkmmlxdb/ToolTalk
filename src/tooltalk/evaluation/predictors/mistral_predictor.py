@@ -1,7 +1,7 @@
 import json
 import logging
 
-from tooltalk.evaluation.tool_executor import BaseAPIPredictor
+from eval_generations.benchmarks.ToolTalk.src.tooltalk.evaluation.tool_executor import BaseAPIPredictor
 from transformers import AutoTokenizer
 
 from .constants import DBRX_SYSTEM_PROMPT
